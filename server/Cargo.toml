@@ -1,0 +1,28 @@
+[package]
+name = "server"
+version = "0.1.0"
+description = ""
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+bytes = "1"
+console_error_panic_hook = "0.1"
+http = { workspace = true }
+futures-util = "0.3"
+mime = "0.3"
+worker = { workspace = true }
+
+common = { path = "../common" }
+
+[dev-dependencies]
+again = "0.1"
+anyhow = "1"
+assert_matches = "1"
+reqwest = "0.11"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+url = "2"
+uuid = { version = "1", features = ["v4"] }
+zstd = "0.12"

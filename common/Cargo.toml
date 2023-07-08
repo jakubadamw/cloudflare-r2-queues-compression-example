@@ -1,0 +1,10 @@
+[package]
+name = "common"
+version = "0.1.0"
+description = ""
+edition = "2021"
+
+[dependencies]
+async-stream = "0.3"
+futures-util = "0.3"
+strum = { version = "0.25", features = ["derive"] }

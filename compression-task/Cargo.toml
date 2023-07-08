@@ -1,0 +1,20 @@
+[package]
+name = "compression-task"
+version = "0.1.0"
+description = ""
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+async-compression = { version = "0.4", features = ["futures-io", "zstd"] }
+bytes = "1"
+console_error_panic_hook = "0.1"
+dencode = { version  = "0.3", features = ["async"] }
+futures-util = "0.3"
+pin-project = "1"
+send_wrapper = "0.6"
+worker = { workspace = true }
+
+common = { path = "../common" }

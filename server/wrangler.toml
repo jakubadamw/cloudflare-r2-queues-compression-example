@@ -1,0 +1,15 @@
+name = "cloudflare-workers-r2-queues-zstd-example-server"
+type = "javascript"
+main = "build/worker/shim.mjs"
+workers_dev = false
+compatibility_date = "2023-07-09"
+
+route = { pattern = "workers-r2-queue-zstd-demo.jakubw.eu", custom_domain = true }
+
+[[queues.producers]]
+queue = "cloudflare-workers-r2-queues-zstd-example-compression-queue"
+binding = "QUEUE"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "cloudflare-workers-r2-queues-zstd-example-bucket"

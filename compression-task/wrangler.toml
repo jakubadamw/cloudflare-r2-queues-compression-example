@@ -1,0 +1,12 @@
+name = "cloudflare-workers-r2-queues-zstd-example-compression-task"
+type = "javascript"
+main = "build/worker/shim.mjs"
+workers_dev = false
+compatibility_date = "2023-07-09"
+
+[[queues.consumers]]
+queue = "cloudflare-workers-r2-queues-zstd-example-compression-queue"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "cloudflare-workers-r2-queues-zstd-example-bucket"

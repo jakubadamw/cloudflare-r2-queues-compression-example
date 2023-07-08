@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "common",
+    "compression-task",
+    "server"
+]
+
+resolver = "2"
+
+[workspace.dependencies]
+http = "0.2"
+worker = { version = "0.0.17", features = ["queue"] }

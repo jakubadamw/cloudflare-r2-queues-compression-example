@@ -1,0 +1,163 @@
+name: Deploy
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  create_bucket:
+    name: Create the bucket
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js with caching
+        uses: actions/setup-node@v3
+        timeout-minutes: 5
+        continue-on-error: true
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "yarn"
+          cache-dependency-path: "**/yarn.lock"
+
+      - name: Install wrangler
+        run: |
+          npm install -g "wrangler@${WRANGLER_VERSION}"
+
+      - name: Publish the GraphQL worker
+        working-directory: ${{ matrix.worker }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          wrangler r2 bucket create cloudflare-workers-r2-queues-zstd-example-bucket || echo "Bucket already exists."
+
+  create_queue:
+    name: Create the queue
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js with caching
+        uses: actions/setup-node@v3
+        timeout-minutes: 5
+        continue-on-error: true
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "yarn"
+          cache-dependency-path: "**/yarn.lock"
+
+      - name: Install wrangler
+        run: |
+          npm install -g "wrangler@${WRANGLER_VERSION}"
+
+      - name: Publish the GraphQL worker
+        working-directory: ${{ matrix.worker }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          wrangler queues create cloudflare-workers-r2-queues-zstd-example-compression-queue || echo "Queue already exists."
+
+  build_and_deploy_worker:
+    needs: [create_bucket, create_queue]
+    name: Build and deploy a Cloudflare worker
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    strategy:
+      matrix:
+        worker:
+          - compression-task
+          - server
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Load .env
+        uses: xom9ikk/dotenv@v1.0.2
+        with:
+          path: .github
+
+      - name: Slugify the path
+        run: |
+          echo "PATH_SLUGIFIED=$(./scripts/slugify.sh "${{ matrix.worker }}")" >> $GITHUB_ENV
+
+      - name: Create a directory for binary dependencies
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/bin
+          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+          target: wasm32-unknown-unknown
+
+      - name: Cargo cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo
+          key: cargo-${{ github.job }}-${{ env.PATH_SLUGIFIED }}-${{ hashFiles('Cargo.lock', 'Cargo.toml') }}
+
+      - name: Rust cache
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: target-${{ runner.os }}-${{ runner.arch }}-${RUST_VERSION}-${{ github.job }}-${PATH_SLUGIFIED}-${{ hashFiles('Cargo.lock', 'Cargo.toml') }}
+
+      - name: Install wasm-opt
+        shell: bash
+        working-directory: ${{ github.workspace }}/bin
+        run: |
+          curl -fSsL https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz | tar --strip-components=2 -xzvf- binaryen-version_${BINARYEN_VERSION}/bin/wasm-opt
+          chmod +x ./wasm-opt
+
+      - name: Install wasm-pack
+        working-directory: ${{ github.workspace }}/bin
+        run: |
+          file_name="wasm-pack-v${WASM_PACK_VERSION}-x86_64-unknown-linux-musl"
+          curl -fSsL https://github.com/rustwasm/wasm-pack/releases/download/v${WASM_PACK_VERSION}/${file_name}.tar.gz | tar --strip-components=1 -xzvf- "${file_name}/wasm-pack"
+
+      - name: Install worker-build
+        run: |
+          cargo install worker-build --git https://github.com/cloudflare/workers-rs.git
+
+      - name: Build the worker
+        working-directory: ${{ matrix.worker }}
+        run: |
+          export GIT_COMMIT_HASH=$(git rev-parse HEAD)
+          touch src/lib.rs
+          worker-build --release
+
+      - name: Set up Node.js with caching
+        uses: actions/setup-node@v3
+        timeout-minutes: 5
+        continue-on-error: true
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "yarn"
+          cache-dependency-path: "**/yarn.lock"
+
+      - name: Install wrangler
+        run: |
+          npm install -g "wrangler@${WRANGLER_VERSION}"
+
+      - name: Publish the GraphQL worker
+        working-directory: ${{ matrix.worker }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          wrangler publish
